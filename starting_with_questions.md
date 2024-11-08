@@ -88,23 +88,98 @@ From my data analysis, there do seem to be certain patterns emerging. In major c
 
 SQL Queries:
 
+SELECT 
+    asess.city,
+    asess.country,
+    asess.V2_Product_Name,
+    SUM(COALESCE(anlyt.units_sold, 0)) AS total_sold
+FROM 
+    all_sessions asess
+JOIN 
+    analytics anlyt ON asess.visit_Id = anlyt.visit_Id
+GROUP BY 
+    asess.city, asess.country, asess.V2_Product_Name
+ORDER BY 
+    total_sold DESC;
 
+WITH ranked_prod_sales AS (
+    SELECT 
+        asess.city,
+        asess.country,
+        asess.V2_Product_Name,
+        SUM(COALESCE(anlyt.units_sold, 0)) AS total_units_sold,
+        ROW_NUMBER() OVER (PARTITION BY asess.city ORDER BY SUM(COALESCE(anlyt.units_sold, 0)) DESC) AS row_num
+    FROM 
+        all_sessions asess
+    JOIN 
+        analytics anlyt ON asess.visit_Id = anlyt.visit_Id
+	WHERE 
+        asess.city != 'not available in demo dataset'
+        AND asess.city != '(not set)'
+    GROUP BY 
+        asess.city, asess.country, asess.V2_Product_Name
+)
+SELECT 
+    city,
+    country,
+    V2_Product_Name,
+    total_units_sold
+FROM 
+    ranked_prod_sales
+WHERE 
+    row_num = 1
+ORDER BY 
+    total_units_sold DESC;
 
 Answer:
 
+Based on my analysis, the top-selling products in each city/country include Google-branded items like the "Google Alpine Style Backpack" in New York and Chicago, and the "Google Men's Airflow Pullover" in Mountain View. Sunnyvale's top seller is the "SPF-15 Slim & Slender Lip Balm," which stands out as a non-tech product. This suggests that while Google products are popular in tech-centric cities, there is also a variation in product preferences, with some regions favoring lifestyle items over tech products.
 
-
+The data includes a variety of tech and lifestyle items, such as the "Nest® Cam Indoor Security Camera" in Seattle and "Nest® Learning Thermostat" in Palo Alto, reflecting a strong preference for smart home products in tech-forward cities. Other popular items include the "YouTube Hard Cover Journal" in Pittsburgh and Tel Aviv-Yafo, and the "Google Sunglasses" in Houston. The diversity of products sold suggests a regional preference for both technology-related merchandise and lifestyle items, with cities like Toronto and Santiago leaning towards apparel and accessories, while others, like Bangkok, favor practical items like the "Double Wall Insulated Bottle." This variation could be influenced by the local culture and consumer needs.
 
 
 **Question 5: Can we summarize the impact of revenue generated from each city/country?**
 
 SQL Queries:
 
+SELECT total_ordered
+FROM sales_report
+LIMIT 5
 
+WITH ranked_revenue AS (
+    SELECT 
+        asess.city,
+        asess.country,
+        SUM(COALESCE(sku.total_ordered, 0) * COALESCE(anlyt.unit_price, 0)) AS total_revenue,
+        ROW_NUMBER() OVER (PARTITION BY asess.country ORDER BY SUM(COALESCE(sku.total_ordered, 0) * COALESCE(anlyt.unit_price, 0)) DESC) AS row_num
+    FROM 
+        all_sessions asess
+    JOIN 
+        analytics anlyt ON asess.visit_Id = anlyt.visit_Id
+    LEFT JOIN 
+        sales_by_sku sku ON asess.product_SKU = sku.product_SKU
+    WHERE 
+        COALESCE(sku.total_ordered, 0) > 0 
+        AND COALESCE(anlyt.unit_price, 0) > 0
+        AND asess.city != 'not available in demo dataset'
+        AND asess.city != '(not set)'
+    GROUP BY 
+        asess.city, asess.country
+)
+SELECT 
+    city,
+    country,
+    total_revenue
+FROM 
+    ranked_revenue
+WHERE 
+    row_num = 1
+ORDER BY 
+    total_revenue DESC;
 
 Answer:
 
-
+Based on my data analysis, the revenue generated from various cities and countries shows that Mountain View in the United States leads with a total of $6,729,805 in revenue. Following behind is Shinjuku in Japan, contributing $570,842. Other notable cities include Rome in Italy with $508,437, Hamburg in Germany with $423,700, and London in the United Kingdom, generating $423,641 in revenue. This highlights a significant disparity in revenue, with Mountain View standing out as the top financial contributor.
 
 
 
